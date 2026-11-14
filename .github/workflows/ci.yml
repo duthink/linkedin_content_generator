@@ -1,23 +1,28 @@
+# pingdin:managed ci 1.0 ad0b294c3662
+# Written by pingdin Dev from what this repository contains: Python command-line tool · pip · Python 3.11 · code in src/ · no tests yet.
+# Edit it freely. While this file is as Dev wrote it, Dev may replace it with an improved one by pull request; once you edit it, Dev leaves it alone.
 name: tests
 on:
   pull_request:
   push:
-    branches: [master]
+    branches: ["master"]
+permissions:
+  contents: read
 jobs:
   tests:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: .
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: "${{ github.workspace }}/src"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
-      - name: Install the project and the test runner
+          python-version: "3.11"
+      - name: Install the project
         run: |
           python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          if [ -f pyproject.toml ]; then pip install -e . || pip install .; fi
-          pip install pytest
-      - run: python -m pytest -q
+          pip install -r requirements.txt
+      - name: Check the code builds
+        run: |
+          python -m compileall -q . -x '(^|/)(\.venv|venv|env|node_modules|\.git|build|dist|site-packages)(/|$)'

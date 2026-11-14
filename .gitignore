@@ -4,3 +4,12 @@ poetry.lock
 pyproject.toml
 output/
 logs/
+
+# pingdin:gitignore begin 1.0
+# Files a command-line tool should not commit (added by Dev; edit freely outside this block)
+__pycache__/
+*.pyc
+venv/
+*.egg-info/
+.pytest_cache/
+# pingdin:gitignore end
