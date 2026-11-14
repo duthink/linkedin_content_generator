@@ -1,7 +1,7 @@
 <!-- pingdin:rules begin 1.0 -->
 ## How to work in this project
 
-Setup kit: rules@1.0 journal@1.0 pr-template@1.0 areas@1.0 ci-python@1.0 first-test@1.0 journeys@1.0 coding-agent@1.0
+Setup kit: rules@1.0 journal@1.0 pr-template@1.0 areas@1.0 journeys@1.0 coding-agent@1.0 gitignore@1.0
 
 Keep each change small and explain it in plain words. Run the tests before you ask for a review. Work inside the area the request names.
 
@@ -25,9 +25,6 @@ When a real choice comes up (scope, cost, speed, data or design), post one comme
 - Every pull request explains itself in plain words.
 - Leaked keys are caught.
 - Libraries with known weaknesses are flagged.
-- Database changes are flagged; destructive ones need the owner's approval.
-- The key user journeys are tested in a real browser on every pull request.
-- Production only gets code that passed on staging.
 - Every change is recorded: requested by, approved by, why, checks, time.
 - The coding agent can be asked to work on confirmed requests.
 
