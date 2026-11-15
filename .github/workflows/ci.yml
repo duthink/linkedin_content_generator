@@ -1,5 +1,5 @@
-# pingdin:managed ci 1.0 ad0b294c3662
-# Written by pingdin Dev from what this repository contains: Python command-line tool · pip · Python 3.11 · code in src/ · no tests yet.
+# pingdin:managed ci 1.0 888f7d9b523e
+# Written by pingdin Dev from what this repository contains: Python command-line tool · pip · code in src/ · no tests yet.
 # Edit it freely. While this file is as Dev wrote it, Dev may replace it with an improved one by pull request; once you edit it, Dev leaves it alone.
 name: tests
 on:
@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
       - name: Install the project
         run: |
           python -m pip install --upgrade pip
