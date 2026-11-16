@@ -226,6 +226,59 @@ def test_get_completion_returns_trimmed_text(config_path, monkeypatch):
     assert calls[0]["messages"][-1] == {"role": "user", "content": "question"}
 
 
+def test_model_comes_from_config(config_path, monkeypatch):
+    monkeypatch.delenv("OPENAI_MODEL", raising=False)
+    calls = []
+
+    def create(**kwargs):
+        calls.append(kwargs)
+        return reply("answer")
+
+    fake_openai(monkeypatch, create)
+    generator = ContentGenerator(api_key=FAKE_KEY, config_path=config_path)
+    expected = yaml.safe_load(Path(config_path).read_text())["model"]
+    assert generator.model == expected
+    generator._get_completion("question")
+    assert calls[0]["model"] == expected
+
+
+def test_shipped_config_no_longer_uses_old_model(config_path, monkeypatch):
+    monkeypatch.delenv("OPENAI_MODEL", raising=False)
+    generator = ContentGenerator(api_key=FAKE_KEY, config_path=config_path)
+    assert generator.model != "gpt-3.5-turbo"
+
+
+def test_env_variable_overrides_config_model(config_path, monkeypatch):
+    monkeypatch.setenv("OPENAI_MODEL", "test-model-from-env")
+    calls = []
+
+    def create(**kwargs):
+        calls.append(kwargs)
+        return reply("answer")
+
+    fake_openai(monkeypatch, create)
+    generator = ContentGenerator(api_key=FAKE_KEY, config_path=config_path)
+    generator._get_completion("question")
+    assert calls[0]["model"] == "test-model-from-env"
+
+
+def test_default_model_used_when_config_has_none(config_path, tmp_path, monkeypatch):
+    monkeypatch.delenv("OPENAI_MODEL", raising=False)
+    data = yaml.safe_load(Path(config_path).read_text())
+    data.pop("model", None)
+    path = tmp_path / "no_model.yaml"
+    path.write_text(yaml.safe_dump(data))
+    generator = ContentGenerator(api_key=FAKE_KEY, config_path=str(path))
+    assert generator.model == linkedin_generator.DEFAULT_MODEL
+
+
+@pytest.mark.parametrize("blank", ["", "   "])
+def test_blank_env_variable_is_ignored(config_path, monkeypatch, blank):
+    monkeypatch.setenv("OPENAI_MODEL", blank)
+    generator = ContentGenerator(api_key=FAKE_KEY, config_path=config_path)
+    assert generator.model == yaml.safe_load(Path(config_path).read_text())["model"]
+
+
 def test_get_completion_retries_then_gives_up(config_path, monkeypatch):
     attempts = []
 

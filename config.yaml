@@ -1,3 +1,7 @@
+# OpenAI model used to write the content. To upgrade later, change this line.
+# The OPENAI_MODEL environment variable (for example in .env) overrides it.
+model: gpt-4.1-mini
+
 # Content Types, Goals, and Metrics Configuration
 content_types:
   - text
