@@ -1,460 +1,216 @@
-# LinkedIn Content Generator Documentation
+# LinkedIn Content Generator
+
+A command-line tool that writes LinkedIn content with OpenAI. You give it a topic and a content type; it writes the piece in the brand voice set in `config.yaml` and saves it to the `output/` folder.
 
 ## Table of Contents
-- [Overview](#overview)
+- [What it makes](#what-it-makes)
+- [Requirements](#requirements)
 - [Installation](#installation)
-- [Project Structure](#project-structure)
-- [Configuration](#configuration)
-- [Core Components](#core-components)
 - [Usage](#usage)
-- [Content Types](#content-types)
-- [Error Handling](#error-handling)
+- [Output files](#output-files)
+- [Configuration](#configuration)
+- [Using it from Python](#using-it-from-python)
 - [Logging](#logging)
-- [Best Practices](#best-practices)
-- [Troubleshooting](#troubleshooting)
-- [Performance Optimization](#performance-optimization)
-- [Security Considerations](#security-considerations)
+- [Running the tests](#running-the-tests)
+- [Project structure](#project-structure)
+- [Known limitations](#known-limitations)
 - [Contributing](#contributing)
 
-## Overview
+## What it makes
 
-The LinkedIn Content Generator automates the creation of various LinkedIn content types. It supports multiple formats, ensures consistent brand voice, and includes robust error handling and logging.
+| Content type   | What you get |
+|----------------|--------------|
+| `text`         | A post with a hook, main body, call to action and hashtags |
+| `carousel`     | A title plus one slide per section (sections come from `templates.carousel_sections`) |
+| `poll`         | A poll question, a short intro, and up to `poll_options` (4) answers taken from `templates.poll_structures` |
+| `newsletter`   | A newsletter with one part per section in `templates.newsletter_sections` |
+| `video_script` | A script split into the timed sections in `templates.video_script_sections` |
+| `document`     | A whitepaper laid out with the sections in `templates.document_sections.whitepaper` |
 
-### Key Features
+The writing is done by OpenAI's `gpt-3.5-turbo` model. Failed calls are retried up to 3 times, waiting a little longer each time.
 
-- Multiple content type generation (text, carousel, polls, etc.)
-- Brand voice consistency
-- Configurable templates
-- Robust error handling and logging
-- Backup and recovery system
-- Content validation
-- Format-specific optimization
+## Requirements
+
+- Python 3.8 or newer
+- An OpenAI API key
 
 ## Installation
 
-### Prerequisites
-
-- Python 3.8+
-- OpenAI API key
-
-### Dependencies
-
 ```bash
-pip install openai loguru pyyaml click python-dotenv
+git clone https://github.com/duthink/linkedin_content_generator.git
+cd linkedin_content_generator
+pip install -r requirements.txt
 ```
 
-### Environment Setup
-
-Create a `.env` file in the project root:
+Create a `.env` file in the project root (it is already in `.gitignore`, so it won't be committed):
 
 ```env
 OPENAI_API_KEY=your_api_key_here
 ```
 
-## Project Structure
+## Usage
+
+Run the tool from the project root:
+
+```bash
+python src/main.py --topic "AI in Healthcare" --content-type text
+```
+
+If you leave out `--topic` or `--content-type`, the tool asks for them.
+
+### Options
+
+| Option | Short | Default | Description |
+|--------|-------|---------|-------------|
+| `--config` | `-c` | `config.yaml` | Path to the configuration file |
+| `--topic` | `-t` | asked for | Topic to write about |
+| `--content-type` | `-ct` | asked for | One of `text`, `carousel`, `poll`, `newsletter`, `video_script`, `document` |
+| `--slides` | `-s` | `carousel_slides` in the config (6) | Number of slides for a carousel (see [Known limitations](#known-limitations)) |
+| `--duration` | `-d` | `video_length_minutes` in the config (3) | Video script length, in **minutes** |
+| `--backup-dir` | `-b` | none | Also copy the saved files into this folder |
+
+### Examples
+
+```bash
+# Text post
+python src/main.py -t "AI in Healthcare" -ct text
+
+# Poll
+python src/main.py -t "AI in Healthcare" -ct poll
+
+# Newsletter
+python src/main.py -t "AI in Healthcare" -ct newsletter
+
+# 2-minute video script
+python src/main.py -t "AI in Healthcare" -ct video_script --duration 2
+
+# Whitepaper, with a backup copy of the files
+python src/main.py -t "AI in Healthcare" -ct document --backup-dir backups
+```
+
+When it finishes, the tool prints where the files were saved and a preview of the first 500 characters.
+
+## Output files
+
+Each run saves three files to `output/<content_type>/`, named after the topic and the time of the run:
 
 ```
-project/
-├── src/
-│   ├── linkedin_generator.py    # Main content generation logic
-│   ├── output_manager.py        # Output handling and formatting
-│   ├── main.py                  # CLI interface
-│   ├── log_config.py            # Logging configuration
-│   └── utilities.py             # Utility functions
-├── logs/                
-│  ├── info/             # Information logs
-│  ├── error/            # Error logs
-│  └── debug/            # Debug logs
-├── output/
-│  ├── carousel/                 # Carousel content
-│  ├── document/                 # Document content
-│  ├── newsletter/               # Newsletter content
-│  ├── poll/                     # Poll content
-│  ├── text/                     # Text content
-│  └── video_script/             # Video script content
-├── README.md            # Main documentation
-├── config.yaml          # Configuration file
-├── requirements.txt     # Dependencies file
-├── .env                 # Environment variables file
-├── .gitignore           # Git ignore file
+output/text/
+├── ai in healthcare_20261116_091500.json        # Everything that was generated
+├── ai in healthcare_20261116_091500.txt         # Ready-to-post text (.md for other types)
+└── ai in healthcare_20261116_091500_meta.yaml   # Topic, hook, CTA, time created and config used
 ```
+
+If `--backup-dir` is given, the same files are also copied there. The `output/` folder is in `.gitignore`.
 
 ## Configuration
 
-### Config File Structure
+Everything that shapes the writing lives in `config.yaml`:
 
-The `config.yaml` file contains all necessary configurations:
+| Section | What it controls |
+|---------|------------------|
+| `content_types`, `content_goals`, `optimization_metrics` | The lists of supported types, goals and metrics |
+| `brand_voice` | Tone, style, personality, key phrases, emoji style and hashtags |
+| `content_config` | Main goal, target audience, industry and extra settings (`carousel_slides`, `poll_options`, `video_length_minutes`, …) |
+| `templates` | Hook and call-to-action lines for each type, plus the sections used for carousels, newsletters, video scripts and documents. `{topic}` is replaced with your topic |
+| `formatting` | Layout guidance for each content type |
+| `engagement_patterns` | Patterns that tend to perform well |
 
-```yaml
-content_types:            # Supported content types
-brand_voice:              # Brand voice characteristics
-content_config:           # Content generation settings
-templates:                # Content templates
-formatting:               # Format-specific settings
-```
+The tool stops with an error if any of these are missing or empty: `content_config.primary_goal`, `content_config.target_audience`, `content_config.industry_context`, `brand_voice.tone`, `brand_voice.style`, or the `templates` section.
 
-### Brand Voice Configuration
-
-```yaml
-brand_voice:
-   tone:
-      - professional
-      - authoritative
-   style:
-      - conversational
-      - storytelling
-   personality:
-      - authentic
-      - trustworthy
-```
-
-## Core Components
-
-### ContentGenerator
-
-Main class responsible for content generation:
-
-```python
-generator = ContentGenerator(api_key="your_api_key", config_path="config.yaml")
-content = generator.generate(
-      content_type="text",
-      topic="AI in Healthcare"
-)
-```
-
-### OutputManager
-
-Handles content saving and formatting:
-
-```python
-output_manager = OutputManager(backup_dir="backups")
-paths = output_manager.save_content(content, "text")
-```
-
-## Usage
-
-### Command Line Interface
-
-The LinkedIn Content Generator can be used via the command line interface (CLI).
-
-#### Basic Command
-
-To generate content, use the following command:
-
-```bash
-python src/main.py --config config.yaml --topic "AI Trends" --content-type text
-```
-
-#### Options
-
-- `--config, -c`: Path to the configuration file.
-- `--topic, -t`: Topic for the content generation.
-- `--content-type, -ct`: Type of content to generate (e.g., text, carousel, poll, etc.).
-- `--slides, -s`: Number of slides for carousel content (default: 8).
-- `--duration, -d`: Duration for video scripts (in seconds).
-- `--backup-dir, -b`: Directory path for saving backups.
-
-#### Examples
-
-1. **Generate a Text Post:**
-
-```bash
-python src/main.py --config config.yaml --topic "AI in Healthcare" --content-type text
-```
-
-2. **Generate a Carousel with Custom Slides:**
-
-```bash
-python src/main.py --config config.yaml --topic "AI in Healthcare" --content-type carousel --slides 10
-```
-
-3. **Generate a Video Script with Specific Duration:**
-
-```bash
-python src/main.py --config config.yaml --topic "AI in Healthcare" --content-type video_script --duration 120
-```
-
-4. **Generate a Poll:**
-
-```bash
-python src/main.py --config config.yaml --topic "AI in Healthcare" --content-type poll
-```
-
-5. **Generate a Newsletter:**
-
-```bash
-python src/main.py --config config.yaml --topic "AI in Healthcare" --content-type newsletter
-```
-
-### Programmatic Usage
-
-The LinkedIn Content Generator can also be used programmatically within your Python code.
-
-#### Example
-
-```python
-from linkedin_generator import ContentGenerator, OutputManager
-
-# Initialize the content generator
-generator = ContentGenerator(api_key="your_api_key", config_path="config.yaml")
-
-# Generate content
-content = generator.generate(
-    content_type="text",
-    topic="AI in Healthcare"
-)
-
-# Initialize the output manager
-output_manager = OutputManager(backup_dir="backups")
-
-# Save the generated content
-paths = output_manager.save_content(content, "text")
-```
-
-### Advanced Configuration
-
-#### Using Custom Templates
-
-Specify custom templates for content generation in the `config.yaml` file:
-
-```yaml
-templates:
-   text: "templates/text_template.md"
-   carousel: "templates/carousel_template.md"
-   poll: "templates/poll_template.md"
-   newsletter: "templates/newsletter_template.md"
-   video_script: "templates/video_script_template.md"
-```
-
-#### Setting Brand Voice
-
-Customize the brand voice to ensure consistency across all generated content:
+Example brand voice:
 
 ```yaml
 brand_voice:
-   tone:
-    - professional
-    - authoritative
-   style:
+  tone:
+    - casual
+    - empathetic
+  style:
     - conversational
     - storytelling
-   personality:
+  personality:
     - authentic
-    - trustworthy
+    - curious
+  emoji_style: minimal
+  industry_hashtags:
+    - AIJourney
+    - TechLessons
 ```
 
-### Debugging and Logging
+## Using it from Python
 
-Enable detailed logging for debugging purposes:
-
-```python
-import logging
-from linkedin_generator import logger
-
-logger.setLevel(logging.DEBUG)
-```
-
-### Backup and Recovery
-
-Ensure that all generated content is backed up and can be recovered in case of failures:
+The modules import each other by name, so put `src/` on the import path first (for example `export PYTHONPATH=src`).
 
 ```python
-output_manager = OutputManager(backup_dir="backups")
-paths = output_manager.save_content(content, "text")
-```
+from linkedin_generator import ContentGenerator
+from output_manager import OutputError
 
-### Error Handling
+generator = ContentGenerator(api_key="your_api_key", config_path="config.yaml")
 
-Handle errors gracefully by implementing robust error handling mechanisms:
-
-```python
 try:
-    content = generator.generate(content_type="text", topic="AI in Healthcare")
-except ValidationError as e:
-    print(f"Validation error: {e}")
+    content = generator.generate(content_type="carousel", topic="AI in Healthcare", num_slides=5)
 except OutputError as e:
-    print(f"Output error: {e}")
+    print(f"Could not save the content: {e}")
+
+print(content["output_paths"])  # {'json': ..., 'formatted': ..., 'metadata': ...}
 ```
 
-## Content Types
+`generate()` saves the files itself and returns the generated content with an `output_paths` entry. Extra settings you can pass:
 
-### Supported Types
+- `num_slides` for `carousel`
+- `duration` (minutes) for `video_script`
+- `document_type="case_study"` for `document` (the default is `whitepaper`)
 
-1. Text Posts
-    - Regular LinkedIn posts
-    - Character limit: 3000
-    - Supports formatting and emoji
-
-2. Carousels
-    - Multi-slide presentations
-    - Configurable slides (default: 8)
-    - Template-based structure
-
-3. Polls
-    - Interactive polls
-    - 2-4 options
-    - Custom poll structures
-
-4. Newsletters
-    - Structured content
-    - Multiple sections
-    - Template-based
-
-5. Video Scripts
-    - Timed sections
-    - Hook and CTA
-    - Duration-based formatting
-
-6. Documents
-    - Whitepapers
-    - Case studies
-    - Research reports
-
-## Error Handling
-
-### Exception Hierarchy
-
-```python
-class OutputError(Exception):
-      pass
-
-class FileError(OutputError):
-      pass
-
-class SerializationError(OutputError):
-      pass
-
-class ValidationError(OutputError):
-      pass
-```
-
-### Content Validation
-
-Content is validated at multiple levels:
-- Configuration validation
-- Input validation
-- Output validation
-- Format-specific validation
+An unknown content type raises `ValueError`. Problems saving files raise `OutputError` (from `output_manager`), which covers `FileError`, `SerializationError`, `ValidationError` and `RateLimitError`.
 
 ## Logging
 
-### Log Configuration
-
-Three log levels with separate files:
-- INFO: General operation logs
-- ERROR: Error tracking with tracebacks
-- DEBUG: Detailed debugging information
-
-### Log Directory Structure
+Logs are written to `logs/` (also in `.gitignore`), one file per day for each level:
 
 ```
 logs/
-├── info/
-│   └── info_YYYY-MM-DD.log
-├── error/
-│   └── error_YYYY-MM-DD.log
-└── debug/
-      └── debug_YYYY-MM-DD.log
+├── info/info_YYYY-MM-DD.log     # kept 30 days
+├── error/error_YYYY-MM-DD.log   # kept 30 days, includes tracebacks
+└── debug/debug_YYYY-MM-DD.log   # kept 15 days
 ```
 
-## Best Practices
+Info and error messages are also shown in the terminal.
 
-1. Configuration Management
-    - Keep sensitive data in .env
-    - Regular config validation
-    - Version control for configs
+## Running the tests
 
-2. Content Generation
-    - Use templates for consistency
-    - Validate inputs
-    - Include error handling
-    - Implement rate limiting
+The tests use a made-up API key and a fake stand-in for OpenAI, so they need no real key and no network.
 
-3. Output Management
-    - Regular backups
-    - File validation
-    - Atomic operations
-    - Clean up temporary files
-
-## Troubleshooting
-
-### Common Issues
-
-1. Configuration Errors
-    ```
-    Solution: Verify config.yaml structure and required fields
-    ```
-
-2. API Rate Limits
-    ```
-    Solution: Implement exponential backoff
-    ```
-
-3. File Permission Issues
-    ```
-    Solution: Check directory permissions and ownership
-    ```
-
-4. Memory Issues
-    ```
-    Solution: Implement chunked processing for large content
-    ```
-
-### Debug Mode
-
-Enable debug logging:
-
-```python
-logger.level = "DEBUG"
+```bash
+pip install -r requirements-dev.txt
+pytest
 ```
 
-## Performance Optimization
+## Project structure
 
-1. Content Generation
-    - Template caching
-    - Rate limit handling
-    - Batch processing
+```
+.
+├── src/
+│   ├── main.py                 # Command-line tool
+│   ├── linkedin_generator.py   # Writes the content with OpenAI
+│   ├── output_manager.py       # Checks, formats and saves content
+│   ├── log_config.py           # Logging setup
+│   └── utilities.py            # Helpers for turning config into JSON
+├── tests/                      # Automated tests (pytest)
+├── config.yaml                 # Brand voice, templates and settings
+├── requirements.txt            # Libraries the tool needs
+├── requirements-dev.txt        # Extra libraries for running the tests
+├── JOURNAL.md                  # Plain-language log of changes
+└── readme.md                   # This file
+```
 
-2. File Operations
-    - Chunked processing
-    - Atomic operations
-    - Cleanup routines
+`output/` and `logs/` are created automatically the first time the tool runs.
 
-3. Memory Management
-    - Stream large files
-    - Clean temporary files
-    - Regular garbage collection
+## Known limitations
 
-## Security Considerations
-
-1. API Key Management
-    - Use environment variables
-    - Regular key rotation
-    - Access logging
-
-2. File Operations
-    - Secure file permissions
-    - Path validation
-    - Sanitize inputs
-
-3. Content Validation
-    - Input sanitization
-    - Output validation
-    - Format verification
+- `--slides` on the command line is currently read as text rather than a number, so carousel generation fails when it is used. Leave it out to use `carousel_slides` from `config.yaml`, or pass `num_slides` from Python.
+- The OpenAI model (`gpt-3.5-turbo`) is set in the code and can't be changed from the config.
+- Documents made from the command line are always whitepapers; case studies are only available from Python.
 
 ## Contributing
 
-1. Code Style
-    - Follow PEP 8
-    - Type hints
-    - Documentation strings
-
-2. Testing
-    - Unit tests
-    - Integration tests
-    - Coverage reports
-
-3. Version Control
-    - Feature branches
-    - Pull requests
-    - Version tagging
+Every change goes through a pull request, needs passing tests, and adds an entry to `JOURNAL.md`. See `AGENTS.md` for the full rules.
