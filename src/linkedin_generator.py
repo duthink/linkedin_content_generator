@@ -1,3 +1,4 @@
+import os
 from typing import List, Dict, Union
 import openai
 from dataclasses import dataclass, field
@@ -9,6 +10,11 @@ from time import sleep
 from log_config import LogConfig
 from output_manager import OutputManager
 from utilities import serialize_config
+
+# Model used when neither the OPENAI_MODEL environment variable nor `model:`
+# in config.yaml says otherwise. Upgrading the model should only need a change
+# to config.yaml (or this one line), not to the code that calls OpenAI.
+DEFAULT_MODEL = "gpt-4.1-mini"
 
 class ContentType(Enum):
     TEXT = "text"
@@ -111,7 +117,11 @@ class ContentGenerator:
         except Exception as e:
             self.logger.error(f"Failed to load templates: {e}")
             raise
-        
+
+        # Pick the OpenAI model: environment variable, then config, then default
+        self.model = self._resolve_model(self._load_config(config_path))
+        self.logger.info(f"Using OpenAI model: {self.model}")
+
         # Initialize output manager
         self.output_manager = OutputManager()
         self.logger.debug("Output manager initialized")
@@ -128,6 +138,14 @@ class ContentGenerator:
         except yaml.YAMLError as e:
             self.logger.error(f"Error parsing configuration file: {e}")
             raise
+
+    @staticmethod
+    def _resolve_model(config_data: Dict) -> str:
+        """Return the model name: OPENAI_MODEL env var, then `model:` in config, then DEFAULT_MODEL"""
+        for value in (os.getenv("OPENAI_MODEL"), (config_data or {}).get("model")):
+            if value and str(value).strip():
+                return str(value).strip()
+        return DEFAULT_MODEL
 
     def _load_templates(self, config_path: str) -> Dict:
         """Load templates from YAML"""
@@ -185,7 +203,7 @@ class ContentGenerator:
             try:
                 # Use the new API format
                 response = client.chat.completions.create(
-                    model="gpt-3.5-turbo",  # or "gpt-4" if available
+                    model=self.model,
                     messages=[
                         {
                             "role": "system",

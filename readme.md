@@ -27,7 +27,7 @@ A command-line tool that writes LinkedIn content with OpenAI. You give it a topi
 | `video_script` | A script split into the timed sections in `templates.video_script_sections` |
 | `document`     | A whitepaper laid out with the sections in `templates.document_sections.whitepaper` |
 
-The writing is done by OpenAI's `gpt-3.5-turbo` model. Failed calls are retried up to 3 times, waiting a little longer each time.
+The writing is done by an OpenAI model, `gpt-4.1-mini` by default (see [Choosing the model](#choosing-the-model)). Failed calls are retried up to 3 times, waiting a little longer each time.
 
 ## Requirements
 
@@ -47,6 +47,16 @@ Create a `.env` file in the project root (it is already in `.gitignore`, so it w
 ```env
 OPENAI_API_KEY=your_api_key_here
 ```
+
+### Choosing the model
+
+The OpenAI model is set by `model:` at the top of `config.yaml` (default `gpt-4.1-mini`). To upgrade, change that line; no code change is needed. To try a different model without editing the config, set `OPENAI_MODEL` in `.env` or your shell, which takes priority:
+
+```env
+OPENAI_MODEL=gpt-4.1
+```
+
+If neither is set, the tool falls back to `gpt-4.1-mini`. The model you pick must work with OpenAI's chat completions API and accept a `temperature` setting (the tool uses 0.7); some reasoning models don't, and their calls will fail.
 
 ## Usage
 
@@ -208,7 +218,6 @@ pytest
 ## Known limitations
 
 - `--slides` on the command line is currently read as text rather than a number, so carousel generation fails when it is used. Leave it out to use `carousel_slides` from `config.yaml`, or pass `num_slides` from Python.
-- The OpenAI model (`gpt-3.5-turbo`) is set in the code and can't be changed from the config.
 - Documents made from the command line are always whitepapers; case studies are only available from Python.
 
 ## Contributing
