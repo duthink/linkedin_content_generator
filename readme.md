@@ -27,11 +27,11 @@ A command-line tool that writes LinkedIn content with OpenAI. You give it a topi
 | `video_script` | A script split into the timed sections in `templates.video_script_sections` |
 | `document`     | A whitepaper laid out with the sections in `templates.document_sections.whitepaper` |
 
-The writing is done by an OpenAI model, `gpt-4.1-mini` by default (see [Choosing the model](#choosing-the-model)). Failed calls are retried up to 3 times, waiting a little longer each time.
+The writing is done by an OpenAI model, `gpt-4.1-mini` by default (see [Choosing the model](#choosing-the-model)). Each call to OpenAI is tried up to 3 times in total, waiting a little longer between tries (1 second, then 2) before giving up.
 
 ## Requirements
 
-- Python 3.8 or newer
+- Python 3.9 or newer (some pinned libraries in `requirements.txt` no longer install on 3.8; the automated checks use 3.12)
 - An OpenAI API key
 
 ## Installation
@@ -56,7 +56,7 @@ The OpenAI model is set by `model:` at the top of `config.yaml` (default `gpt-4.
 OPENAI_MODEL=gpt-4.1
 ```
 
-If neither is set, the tool falls back to `gpt-4.1-mini`. The model you pick must work with OpenAI's chat completions API and accept a `temperature` setting (the tool uses 0.7); some reasoning models don't, and their calls will fail.
+If neither is set, the tool falls back to `gpt-4.1-mini`. The model in use is written to the log at start-up (`Using OpenAI model: ...`), so you can check which one was picked. The model you pick must work with OpenAI's chat completions API and accept a `temperature` setting (the tool uses 0.7); some reasoning models don't, and their calls will fail.
 
 ## Usage
 
