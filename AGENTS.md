@@ -1,7 +1,7 @@
 <!-- pingdin:rules begin 1.1 -->
 ## How to work in this project
 
-Setup kit: rules@1.0 journal@1.0 pr-template@1.0 areas@1.0 journeys@1.0 coding-agent@1.0 gitignore@1.0
+Setup kit: rules@1.1 journal@1.0 pr-template@1.0 areas@1.0 journeys@1.0 coding-agent@1.0 gitignore@1.0
 
 Keep each change small and explain it in plain words. Run the tests before you ask for a review. Work inside the area the request names.
 
